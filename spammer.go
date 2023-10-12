@@ -107,8 +107,40 @@ func SelectMessages(in, out chan interface{}) {
 }
 
 func CheckSpam(in, out chan interface{}) {
-	// in - MsgID
-	// out - MsgData
+	wgWorkersStart := &sync.WaitGroup{}
+	chToHash := make(chan MsgID)
+
+	for i := 0; i < HasSpamMaxAsyncRequests; i++ {
+		wgWorkersStart.Add(1)
+
+		go func() {
+			wgWorkersStart.Done()
+
+			for msgIDToHash := range chToHash {
+				hashSpam, err := HasSpam(msgIDToHash)
+				if err != nil {
+					fmt.Printf("error in HasSpam: %s\n", err.Error())
+
+					return
+				}
+
+				out <- MsgData{ID: msgIDToHash, HasSpam: hashSpam}
+			}
+		}()
+	}
+
+	wgWorkersStart.Wait()
+
+	for curMsgID := range in {
+		msgID, ok := curMsgID.(MsgID)
+		if !ok {
+			fmt.Printf("error cast to MsgId curMsgID: %v\n", curMsgID)
+
+			return
+		}
+
+		chToHash <- msgID
+	}
 }
 
 func CombineResults(in, out chan interface{}) {
