@@ -60,8 +60,50 @@ func SelectUsers(in, out chan interface{}) {
 }
 
 func SelectMessages(in, out chan interface{}) {
-	// 	in - User
-	// 	out - MsgID
+	chBatch := make(chan []User)
+	wgGoroutineStart := &sync.WaitGroup{}
+	wgGoroutineStart.Add(1)
+
+	go func() {
+		wgGoroutineStart.Done()
+		for {
+			batchUsers := make([]User, 0, GetMessagesMaxUsersBatch)
+			for idxUser := 0; idxUser < len(batchUsers); idxUser++ {
+				curUser, ok := <-in
+				if !ok {
+					chBatch <- batchUsers
+					close(chBatch)
+
+					return
+				}
+
+				user, ok := curUser.(User)
+				if !ok {
+					fmt.Printf("error cast to user curUser: %v\n", curUser)
+
+					return
+				}
+
+				batchUsers[idxUser] = user
+			}
+
+			chBatch <- batchUsers
+		}
+	}()
+	wgGoroutineStart.Wait()
+
+	for batch := range chBatch {
+		slMsgID, err := GetMessages(batch...)
+		if err != nil {
+			fmt.Printf("error in GetMessages: %s\n", err.Error())
+
+			return
+		}
+
+		for _, msgID := range slMsgID {
+			out <- msgID
+		}
+	}
 }
 
 func CheckSpam(in, out chan interface{}) {
