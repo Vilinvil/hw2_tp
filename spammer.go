@@ -2,10 +2,15 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/Vilinvil/hw2_tp/pkg/async"
 )
+
+func (m *MsgData) toString() string {
+	return fmt.Sprintf("%t %d", m.HasSpam, m.ID)
+}
 
 func RunPipeline(cmds ...cmd) {
 	chIn := make(chan any)
@@ -144,6 +149,46 @@ func CheckSpam(in, out chan interface{}) {
 }
 
 func CombineResults(in, out chan interface{}) {
-	// in - MsgData
-	// out - string
+	var slTrueMsgData []MsgData
+
+	var slFalseMsgData []MsgData
+
+	for curMsgData := range in {
+		msgData, ok := curMsgData.(MsgData)
+		if !ok {
+			fmt.Printf("error cast to MsgData curMsgData: %v\n", curMsgData)
+
+			return
+		}
+
+		if msgData.HasSpam {
+			slTrueMsgData = append(slTrueMsgData, msgData)
+		} else {
+			slFalseMsgData = append(slFalseMsgData, msgData)
+		}
+	}
+
+	wgSlTrueMsgData := &sync.WaitGroup{}
+	wgSlTrueMsgData.Add(1)
+
+	go func() {
+		sort.Slice(slTrueMsgData, func(i, j int) bool {
+			return slTrueMsgData[i].ID < slTrueMsgData[j].ID
+		})
+
+		for _, trueMsgData := range slTrueMsgData {
+			out <- trueMsgData.toString()
+		}
+
+		wgSlTrueMsgData.Done()
+	}()
+
+	sort.Slice(slFalseMsgData, func(i, j int) bool {
+		return slTrueMsgData[i].ID < slTrueMsgData[j].ID
+	})
+	wgSlTrueMsgData.Wait()
+
+	for _, falseMsgData := range slFalseMsgData {
+		out <- falseMsgData.toString()
+	}
 }
