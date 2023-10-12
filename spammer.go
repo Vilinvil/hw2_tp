@@ -75,11 +75,11 @@ func SelectMessages(in, out chan interface{}) {
 		wgGoroutineStart.Done()
 
 		for {
-			batchUsers := make([]User, 0, GetMessagesMaxUsersBatch)
+			batchUsers := make([]User, GetMessagesMaxUsersBatch)
 			for idxUser := 0; idxUser < len(batchUsers); idxUser++ {
 				curUser, ok := <-in
 				if !ok {
-					chBatch <- batchUsers
+					chBatch <- batchUsers[:idxUser]
 					close(chBatch)
 
 					return
@@ -100,6 +100,7 @@ func SelectMessages(in, out chan interface{}) {
 	}()
 	wgGoroutineStart.Wait()
 
+	// maybe parallel
 	for batch := range chBatch {
 		slMsgID, err := GetMessages(batch...)
 		if err != nil {
@@ -116,6 +117,7 @@ func SelectMessages(in, out chan interface{}) {
 
 func CheckSpam(in, out chan interface{}) {
 	wgWorkersStart := &sync.WaitGroup{}
+	wgHashSpam := &sync.WaitGroup{}
 	chToHash := make(chan MsgID)
 
 	for i := 0; i < HasSpamMaxAsyncRequests; i++ {
@@ -123,6 +125,7 @@ func CheckSpam(in, out chan interface{}) {
 
 		go func() {
 			wgWorkersStart.Done()
+			wgHashSpam.Add(1)
 
 			for msgIDToHash := range chToHash {
 				hashSpam, err := HasSpam(msgIDToHash)
@@ -134,6 +137,8 @@ func CheckSpam(in, out chan interface{}) {
 
 				out <- MsgData{ID: msgIDToHash, HasSpam: hashSpam}
 			}
+
+			wgHashSpam.Done()
 		}()
 	}
 
@@ -149,6 +154,8 @@ func CheckSpam(in, out chan interface{}) {
 
 		chToHash <- msgID
 	}
+
+	wgHashSpam.Wait()
 }
 
 func CombineResults(in, out chan interface{}) {
