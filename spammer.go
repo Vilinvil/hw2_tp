@@ -100,19 +100,30 @@ func SelectMessages(in, out chan interface{}) {
 	}()
 	wgGoroutineStart.Wait()
 
-	// maybe parallel
+	wgBatch := &sync.WaitGroup{}
+
 	for batch := range chBatch {
-		slMsgID, err := GetMessages(batch...)
-		if err != nil {
-			fmt.Printf("error in GetMessages: %s\n", err.Error())
+		batch := batch
 
-			return
-		}
+		wgBatch.Add(1)
 
-		for _, msgID := range slMsgID {
-			out <- msgID
-		}
+		go func() {
+			slMsgID, err := GetMessages(batch...)
+			if err != nil {
+				fmt.Printf("error in GetMessages: %s\n", err.Error())
+
+				return
+			}
+
+			for _, msgID := range slMsgID {
+				out <- msgID
+			}
+
+			wgBatch.Done()
+		}()
 	}
+
+	wgBatch.Wait()
 }
 
 func CheckSpam(in, out chan interface{}) {
@@ -155,6 +166,8 @@ func CheckSpam(in, out chan interface{}) {
 		chToHash <- msgID
 	}
 
+	close(chToHash)
+
 	wgHashSpam.Wait()
 }
 
@@ -194,7 +207,7 @@ func CombineResults(in, out chan interface{}) {
 	}()
 
 	sort.Slice(slFalseMsgData, func(i, j int) bool {
-		return slTrueMsgData[i].ID < slTrueMsgData[j].ID
+		return slFalseMsgData[i].ID < slFalseMsgData[j].ID
 	})
 	wgSlTrueMsgData.Wait()
 
