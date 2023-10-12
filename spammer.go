@@ -53,15 +53,17 @@ func SelectUsers(in, out chan interface{}) {
 				return
 			}
 
-			user := GetUser(emailStr)
+			user := GetUser(emailStr) //
 			if _, ok = mapUserUniq.Get(user.ID); !ok {
 				mapUserUniq.Insert(user.ID, struct{}{})
 				out <- user
 			}
+
+			wg.Done()
 		}()
 	}
 
-	wg.Done()
+	wg.Wait()
 }
 
 func SelectMessages(in, out chan interface{}) {
@@ -71,6 +73,7 @@ func SelectMessages(in, out chan interface{}) {
 
 	go func() {
 		wgGoroutineStart.Done()
+
 		for {
 			batchUsers := make([]User, 0, GetMessagesMaxUsersBatch)
 			for idxUser := 0; idxUser < len(batchUsers); idxUser++ {

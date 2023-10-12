@@ -8,7 +8,7 @@ type Map[keyT comparable, valT any] struct {
 }
 
 func New[keyT comparable, valT any](capacity int) *Map[keyT, valT] {
-	return &Map[keyT, valT]{storage: make(map[keyT]valT, capacity)}
+	return &Map[keyT, valT]{storage: make(map[keyT]valT, capacity), rwMu: sync.RWMutex{}}
 }
 
 // Insert - insert element with key and val in map if it not exists. Replace element if element with same key already exist
