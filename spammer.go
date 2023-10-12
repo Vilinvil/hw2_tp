@@ -22,13 +22,12 @@ func RunPipeline(cmds ...cmd) {
 
 		chInGo := chIn
 		chOutGo := chOut
-		cmdCur := cmdCur
 
-		go func() {
+		go func(cmdCur cmd) {
 			cmdCur(chInGo, chOutGo)
 			close(chOutGo)
 			wg.Done()
-		}()
+		}(cmdCur)
 
 		chIn = chOutGo
 		chOut = make(chan any)
@@ -44,8 +43,7 @@ func SelectUsers(in, out chan interface{}) {
 	for curEmail := range in {
 		wg.Add(1)
 
-		curEmail := curEmail
-		go func() {
+		go func(curEmail any) {
 			emailStr, ok := curEmail.(string)
 			if !ok {
 				fmt.Printf("error cast to string curEmail: %v\n", curEmail)
@@ -53,14 +51,14 @@ func SelectUsers(in, out chan interface{}) {
 				return
 			}
 
-			user := GetUser(emailStr) //
+			user := GetUser(emailStr)
 			if _, ok = mapUserUniq.Get(user.ID); !ok {
 				mapUserUniq.Insert(user.ID, struct{}{})
 				out <- user
 			}
 
 			wg.Done()
-		}()
+		}(curEmail)
 	}
 
 	wg.Wait()
@@ -103,11 +101,9 @@ func SelectMessages(in, out chan interface{}) {
 	wgBatch := &sync.WaitGroup{}
 
 	for batch := range chBatch {
-		batch := batch
-
 		wgBatch.Add(1)
 
-		go func() {
+		go func(batch []User) {
 			slMsgID, err := GetMessages(batch...)
 			if err != nil {
 				fmt.Printf("error in GetMessages: %s\n", err.Error())
@@ -120,7 +116,7 @@ func SelectMessages(in, out chan interface{}) {
 			}
 
 			wgBatch.Done()
-		}()
+		}(batch)
 	}
 
 	wgBatch.Wait()
