@@ -7,7 +7,7 @@ type Map[keyT comparable, valT any] struct {
 	rwMu    sync.RWMutex
 }
 
-func New[keyT comparable, valT any](capacity int) *Map[keyT, valT] {
+func NewMap[keyT comparable, valT any](capacity int) *Map[keyT, valT] {
 	return &Map[keyT, valT]{storage: make(map[keyT]valT, capacity), rwMu: sync.RWMutex{}}
 }
 

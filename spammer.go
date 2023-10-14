@@ -38,7 +38,7 @@ func RunPipeline(cmds ...cmd) {
 
 func SelectUsers(in, out chan interface{}) {
 	wg := &sync.WaitGroup{}
-	mapUserUniq := async.New[uint64, struct{}](0)
+	mapUserUniq := async.NewMap[uint64, struct{}](0)
 
 	for curEmail := range in {
 		wg.Add(1)
